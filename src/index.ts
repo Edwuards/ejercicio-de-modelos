@@ -1,22 +1,4 @@
-import { consulta } from './db';
+import { Usuarios } from './db';
 
-type Operadores = "=" | "!=" | "<=" | "<" | ">=" | ">" | "LIKE" ;
-type CláusulaDonde = [string, Operadores , string | number ];
-
-interface Select {
-    campos: Array<string>,
-    donde: Array<CláusulaDonde>,
-}
-
-interface Modelo {
-    mesa: string,
-    campos: Array<string>
-}
-
-class Modelo {
-}
-
-
-consulta(['SELECT * FROM usuarios where id = ?',[1],(error,resultado)=>{
-    console.log(resultado)
-}]);
+let a = Usuarios.select({campos:['firstname','lastname','id'],donde:[['id','=',1]]});
+console.log(a);
