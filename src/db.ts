@@ -1,8 +1,5 @@
 import mysql from 'mysql';
 
-type UserCallBack = (error: mysql.MysqlError | null, resultado: any) => void;
-type ArgumentosConsulta = [string,Array<any>,UserCallBack];
-
 type Operadores = "=" | "!=" | "<=" | "<" | ">=" | ">" | "LIKE" ;
 type CláusulaDonde = [string, Operadores , any ];
 
@@ -26,32 +23,37 @@ const pool = mysql.createPool({
     database: 'ejercicios'
 });
 
-function respuestaMysql(conexión: mysql.PoolConnection, callback: UserCallBack): mysql.queryCallback{
-    return (error, resultado, campos) => {
-        if (error) { throw error; }
-        callback(error, resultado)
-        conexión.release();
-    }
-}
 
-function ConsultaSQL (argumentos: ArgumentosConsulta){
+async function ConsultaSQL (argumentos: [string,Array<any>?]):Promise<any>{
 
-    pool.getConnection((error: mysql.MysqlError, conexión: mysql.PoolConnection) => {
-        if (error) {
-            throw error;
-        }
-        const [sql,valores,cb] = argumentos;
-        let aplicar: Array<any> = [];
-        if(valores.length){
-            conexión.query(sql,valores,respuestaMysql(conexión,cb));
-        }
-        else{
-            conexión.query(sql,respuestaMysql(conexión,cb));
-        }
-        
-
-
+    return new Promise((resolve,reject)=>{
+        pool.getConnection((error: mysql.MysqlError, conexión: mysql.PoolConnection) => {
+            if (error) {
+                throw error;
+            }
+           
+    
+            const [sql,valores] = argumentos;
+            if(valores && valores.length){
+                conexión.query(sql,valores,(error,resultado,campos)=>{
+                    conexión.release();
+                    if(error){ reject(error) }
+                    resolve(resultado);
+                });
+            }
+            else{
+                conexión.query(sql,(error,resultado,campos)=>{
+                    conexión.release();
+                    if(error){ reject(error) }
+                    resolve(resultado);
+                });
+            }
+            
+    
+    
+        })
     })
+    
 }
 
 
@@ -71,18 +73,18 @@ class Modelo {
         },['',[]])
     }
 
-    select(args:Select){
+    async select(args:Select):Promise<any>{
         type argsSql = {campos:string, donde?:[string,Array<any>] , desplazamiento?:string, límite?:string, ordenar?: string };
         const campos:string = args.campos.join(',');
         const donde: undefined | [string,Array<any>] = args.donde ? this.#cláusulaDondeACadena(args.donde) : undefined;
-        const operación = (args:argsSql)=>{ 
+        const operación = async (args:argsSql):Promise<any>=>{ 
             let consulta:string = `SELECT ${args.campos} FROM ${this.#mesa}`;
             if(args.donde){ consulta = consulta+` WHERE ${args.donde[0]}`; }
             if(args.desplazamiento){ consulta = consulta+` OFFSET ${args.desplazamiento}`; }
             if(args.ordenar){ consulta = consulta+` ORDER BY ${args.ordenar}`; }
             if(args.límite){ consulta = consulta+` LIMIT ${args.límite}`; }
-            consulta = consulta + ';';
-            return consulta
+            return ConsultaSQL(args.donde ? [consulta,args.donde[1]] : [consulta] )
+
         }
 
         return operación({campos,donde})
